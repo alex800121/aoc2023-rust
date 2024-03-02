@@ -1,9 +1,12 @@
 use std::array::from_fn;
-use std::collections::{HashMap, HashSet, BTreeMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::Hash;
 use std::ops::Range;
 
-pub fn print_map<E>(map: &BTreeMap<(isize, isize), E>, to_char: impl Fn(Option<&E>) -> char) -> String {
+pub fn print_map<E>(
+    map: &BTreeMap<(isize, isize), E>,
+    to_char: impl Fn(Option<&E>) -> char,
+) -> String {
     let min_x = map.keys().min_by(|x, y| x.0.cmp(&y.0)).unwrap().0;
     let max_x = map.keys().max_by(|x, y| x.0.cmp(&y.0)).unwrap().0;
     let min_y = map.keys().min_by(|x, y| x.1.cmp(&y.1)).unwrap().1;
@@ -18,9 +21,17 @@ pub fn print_map<E>(map: &BTreeMap<(isize, isize), E>, to_char: impl Fn(Option<&
     output
 }
 
-pub fn build_map
-<H: Iterator<Item = I>, I: Iterator<Item = J>, J, K: Ord, E, O: Iterator<Item = (K, E)>>
-(input: H, to_key_elem: impl Fn((usize, usize), J) -> O) -> BTreeMap<K, E> {
+pub fn build_map<
+    H: Iterator<Item = I>,
+    I: Iterator<Item = J>,
+    J,
+    K: Ord,
+    E,
+    O: Iterator<Item = (K, E)>,
+>(
+    input: H,
+    to_key_elem: impl Fn((usize, usize), J) -> O,
+) -> BTreeMap<K, E> {
     let mut output = BTreeMap::new();
     for (i, row) in input.enumerate() {
         for (j, e) in row.enumerate() {
@@ -102,7 +113,7 @@ pub fn bfs<I: Eq + Hash + Clone, U: Clone + Eq + Hash>(
     ends: impl Fn(&HashMap<I, U>) -> bool,
     nexts: impl Fn((I, U), &mut HashMap<I, U>) -> HashMap<I, U>,
 ) -> HashMap<I, U> {
-    let mut results = HashMap::from_iter(starts.clone().into_iter());
+    let mut results = HashMap::from_iter(starts.clone());
     let mut next_starts = HashMap::new();
     while !ends(&starts) {
         for i in starts.drain() {
@@ -236,6 +247,20 @@ pub enum Direction {
     West,
 }
 
+impl Direction {
+    pub fn oppose(&self) -> Self {
+        self.succ().succ()
+    }
+    pub fn to_index(&self) -> (isize, isize) {
+        use Direction::*;
+        match self {
+            North => (0, -1),
+            South => (0, 1),
+            East => (1, 0),
+            West => (-1, 0),
+        }
+    }
+}
 impl Enum for Direction {
     fn to_int(&self) -> isize {
         match self {
@@ -444,4 +469,3 @@ mod tests {
         );
     }
 }
-
