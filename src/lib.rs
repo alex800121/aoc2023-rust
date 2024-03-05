@@ -1,4 +1,4 @@
-use std::array::from_fn;
+use std::array::{self, from_fn};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::Hash;
 use std::ops::Range;
@@ -187,11 +187,19 @@ impl<Idx: Copy + Ord + Hash, const N: usize> EucVec for [Range<Idx>; N] {
 }
 
 pub trait Transpose {
-    fn transpose(&mut self) -> Self;
+    fn transpose(&mut self) -> Self::Transposed;
+    type Transposed;
 }
 
+impl<T: Clone, const N: usize, const M: usize> Transpose for [[T; N]; M] {
+    type Transposed = [[T; M]; N];
+    fn transpose(&mut self) -> Self::Transposed {
+        array::from_fn(|x| array::from_fn(|y| self[y][x].clone()))
+    }
+}
 impl<T> Transpose for Vec<Vec<T>> {
-    fn transpose(&mut self) -> Self {
+    type Transposed = Vec<Vec<T>>;
+    fn transpose(&mut self) -> Self::Transposed {
         let mut new_vec: Vec<Vec<T>> = Vec::new();
         for row in self {
             for i in 0..row.len() {
@@ -205,6 +213,37 @@ impl<T> Transpose for Vec<Vec<T>> {
             }
         }
         new_vec
+    }
+}
+
+pub trait Clockwise {
+    fn clockwise(&mut self) -> Self::Other;
+    fn counter_clockwise(&mut self) -> Self::Other;
+    type Other;
+}
+impl<T: Clone, const N: usize, const M: usize> Clockwise for [[T; N]; M] {
+    type Other = [[T; M]; N];
+    fn clockwise(&mut self) -> Self::Other {
+        self.reverse();
+        self.transpose()
+    }
+
+    fn counter_clockwise(&mut self) -> Self::Other {
+        let mut x = self.transpose();
+        x.reverse();
+        x
+    }
+}
+impl<T> Clockwise for Vec<Vec<T>> {
+    type Other = Vec<Vec<T>>;
+    fn clockwise(&mut self) -> Self {
+        self.reverse();
+        self.transpose()
+    }
+    fn counter_clockwise(&mut self) -> Self {
+        let mut x = self.transpose();
+        x.reverse();
+        x
     }
 }
 
