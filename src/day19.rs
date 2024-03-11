@@ -83,55 +83,57 @@ fn input_parser(input: &str) -> IResult<&str, (Ins<'_>, Vec<Xmas>)> {
             char('}'),
         ),
     )(input)?;
-    Ok((input, (HashMap::from_iter(m), l.into_iter().map(|x| x.try_into().unwrap()).collect())))
+    Ok((
+        input,
+        (
+            HashMap::from_iter(m),
+            l.into_iter().map(|x| x.try_into().unwrap()).collect(),
+        ),
+    ))
 }
 type XmasPlus = [Range; 4];
-fn fill_next<'a>(cond: &Cond, dest: &Dest<'a>, r: XmasPlus) -> Vec<(XmasPlus, Dest<'a>)> {
+fn fill_next<'a>(cond: &Vec<(Cond, Dest<'a>)>, r: XmasPlus) -> Vec<(XmasPlus, Dest<'a>)> {
     use Cond::*;
     let mut v = Vec::new();
     let mut init = vec![r];
     let mut rest = Vec::new();
-    while !init.is_empty() {
-        dbg!(init.len());
-        for r in init {
-            match cond { Pass => v.push((r, *dest)),
-                LessThan(f, i) => {
-                    match r[*f] {
-                        (_, n) if n <= *i => v.push((r, *dest)),
-                        (m, n) if m < *i => {
-                            let mut x = r;
-                            x[*f] = (m, *i);
-                            v.push((x, *dest));
-                            x[*f] = (*i, n);
-                            rest.push(x);
-                        }
-                        _ => rest.push(r),
+    for (c, dest) in cond {
+        for r in init.drain(..) {
+            match c {
+                Pass => v.push((r, *dest)),
+                LessThan(f, i) => match r[*f] {
+                    (_, n) if n <= *i => v.push((r, *dest)),
+                    (m, n) if m < *i => {
+                        let mut x = r;
+                        x[*f] = (m, *i);
+                        v.push((x, *dest));
+                        x[*f] = (*i, n);
+                        rest.push(x);
                     }
+                    _ => rest.push(r),
                 },
-                GreaterThan(f, i) => {
-                    match r[*f] {
-                        (m, _) if m > *i => v.push((r, *dest)),
-                        (m, n) if n > *i + 1 => {
-                            let mut x = r;
-                            x[*f] = (*i + 1, n);
-                            v.push((x, *dest));
-                            x[*f] = (m, *i + 1);
-                            rest.push(x);
-                        }
-                        _ => rest.push(r),
+                GreaterThan(f, i) => match r[*f] {
+                    (m, _) if m > *i => v.push((r, *dest)),
+                    (m, n) if n > *i + 1 => {
+                        let mut x = r;
+                        x[*f] = (*i + 1, n);
+                        v.push((x, *dest));
+                        x[*f] = (m, *i + 1);
+                        rest.push(x);
                     }
-                }
+                    _ => rest.push(r),
+                },
             }
         }
         init = std::mem::take(&mut rest);
     }
     v
 }
-fn calc_range(r: Range, start: &str, ins: Ins<'_>) -> (Vec<XmasPlus>, Vec<XmasPlus>) {
+fn calc_range(range: [Range; 4], start: &str, ins: &Ins<'_>) -> (Vec<XmasPlus>, Vec<XmasPlus>) {
     use Dest::*;
     let mut accepted = Vec::new();
     let mut rejected = Vec::new();
-    let mut init_range = vec![([r; 4], Field(start))];
+    let mut init_range = vec![(range, Field(start))];
     let mut next_range = Vec::new();
     while !init_range.is_empty() {
         for (r, s) in init_range {
@@ -140,10 +142,8 @@ fn calc_range(r: Range, start: &str, ins: Ins<'_>) -> (Vec<XmasPlus>, Vec<XmasPl
                 Rejected => rejected.push(r),
                 Field(s) => {
                     if let Some(cond) = ins.get(s) {
-                        for (c, i) in cond {
-                            let v = fill_next(c, i, r);
-                            next_range.extend(v);
-                        }
+                        let v = fill_next(cond, r);
+                        next_range.extend(v);
                     }
                 }
             }
@@ -155,12 +155,35 @@ fn calc_range(r: Range, start: &str, ins: Ins<'_>) -> (Vec<XmasPlus>, Vec<XmasPl
 
 pub fn run(day: usize) {
     let input = std::fs::read_to_string(format!(
-        "{}/input/test{:02}.txt",
-        // "{}/input/input{:02}.txt",
+        // "{}/input/test{:02}.txt",
+        "{}/input/input{:02}.txt",
         get_project_root().unwrap().to_str().unwrap(),
         day
     ))
     .unwrap();
     let (ins, v) = input_parser(&input).unwrap().1;
-    dbg!(calc_range((1, 4001), "in", ins).0.iter().map(|x| x.iter().map(|(a, b)| b - a).product::<u32>()).sum::<u32>());
+    let a: u64 = v
+        .into_iter()
+        .map(|a| {
+            let a = a.map(|x| (x, x + 1));
+            calc_range(a, "in", &ins)
+                .0
+                .into_iter()
+                .map(|x| {
+                    x.iter()
+                        .map(|x| if x.1 > x.0 { x.0 as u64 } else { 0 })
+                        .sum::<u64>()
+                })
+                .sum::<u64>()
+        })
+        .sum();
+    println!("day19a: {}", a);
+    println!(
+        "day19b: {}",
+        calc_range([(1, 4001); 4], "in", &ins)
+            .0
+            .iter()
+            .map(|x| x.iter().map(|(a, b)| (b - a) as u64).product::<u64>())
+            .sum::<u64>()
+    );
 }
