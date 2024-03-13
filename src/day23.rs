@@ -2,15 +2,16 @@ use aoc2023::{
     Direction::{self, *},
     Enum,
 };
+use itertools::Itertools;
 use project_root::get_project_root;
 use std::collections::{BTreeMap, BTreeSet};
 const N: usize = 141;
 type M = [[char; N]; N];
 type Index = (isize, isize);
-type Vertex = (Index, Index);
-type KMap = BTreeMap<Vertex, usize>;
+// type Vertex = (Index, Index);
+type KMap = BTreeMap<Index, BTreeMap<Index, usize>>;
 fn bfs(start: &Index, end: &Index, m: &M) -> KMap {
-    let mut kmap = BTreeMap::new();
+    let mut kmap: KMap = BTreeMap::new();
     let mut joints = vec![*start];
     for x in 1..(N - 1) {
         for y in 1..(N - 1) {
@@ -51,10 +52,20 @@ fn bfs(start: &Index, end: &Index, m: &M) -> KMap {
                     {
                         match m[y as usize][x as usize] {
                             _ if s1 == *end => {
-                                kmap.insert((s, *end), n + 1);
+                                if let Some(m) = kmap.get_mut(&s) {
+                                    m.insert(*end, n + 1);
+                                } else {
+                                    kmap.insert(s, BTreeMap::from([(*end, n + 1)]));
+                                }
+                                // kmap.insert((s, *end), n + 1);
                             }
                             _ if joints.contains(&s1) => {
-                                kmap.insert((s, s1), n + 1);
+                                if let Some(m) = kmap.get_mut(&s) {
+                                    m.insert(s1, n + 1);
+                                } else {
+                                    kmap.insert(s, BTreeMap::from([(s1, n + 1)]));
+                                }
+                                // kmap.insert((s, s1), n + 1);
                             }
                             c if c != '#' && c != to_char(d.succ().succ()) => {
                                 next_start0.push((x, y));
@@ -80,13 +91,43 @@ fn to_char(d: Direction) -> char {
     }
 }
 
-fn all_routes_2(start: &Index, end: &Index, kmap: &KMap) -> Vec<usize> {
-    let mut all_nodes = Vec::from_iter(kmap.keys().flat_map(|(x, y)| vec![x, y]));
-    all_nodes.retain(|&x| x != start && x != end);
-    for perm in all_nodes.permutations() {
-
+fn all_routes_2(start: &Index, end: &Index, kmap0: &KMap) -> Vec<usize> {
+    let mut kmap: KMap = BTreeMap::new();
+    for (k0, l) in kmap0 {
+        for (k1, n) in l {
+            if let Some(x) = kmap.get_mut(k0) {
+                x.insert(*k1, *n);
+            } else {
+                kmap.insert(*k0, BTreeMap::from([(*k1, *n)]));
+            }
+            if let Some(x) = kmap.get_mut(k1) {
+                x.insert(*k0, *n);
+            } else {
+                kmap.insert(*k1, BTreeMap::from([(*k0, *n)]));
+            }
+        }
     }
-    unimplemented!( )
+    // dbg!(&kmap);
+    let mut start = vec![(*start, BTreeSet::new(), 0)];
+    let mut acc = vec![];
+    while !start.is_empty() {
+        // dbg!(&start);
+        let mut next_start = vec![];
+        for (s, mut visited, n0) in start.drain(..) {
+            visited.insert(s);
+            if s == *end {
+                acc.push(n0);
+            } else if let Some(m) = kmap.get(&s) {
+                for (x, y) in m {
+                    if !visited.contains(x) {
+                        next_start.push((*x, visited.clone(), n0 + *y));
+                    }
+                }
+            }
+        }
+        start = next_start;
+    }
+    acc
 }
 fn all_routes(start: &Index, end: &Index, kmap: &KMap) -> Vec<usize> {
     let mut start = vec![(*start, 0)];
@@ -95,13 +136,12 @@ fn all_routes(start: &Index, end: &Index, kmap: &KMap) -> Vec<usize> {
         // dbg!(&start);
         let mut next_start = vec![];
         for (s, n0) in start.drain(..) {
+            // dbg!(n0);
             if s == *end {
                 acc.push(n0);
-            } else {
-                for ((a, b), n) in kmap.iter() {
-                    if s == *a {
-                        next_start.push((*b, n0 + n));
-                    }
+            } else if let Some(m) = kmap.get(&s) {
+                for (x, y) in m {
+                    next_start.push((*x, n0 + *y));
                 }
             }
         }
