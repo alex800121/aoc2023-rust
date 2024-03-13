@@ -123,5 +123,6 @@ pub fn run(day: usize) {
     let mut input = input_parser(&input).unwrap().1;
     let (foundation, supported) = settle_brick(&mut input);
     let a = input.iter().map(|x| calc_collapse(&foundation, &supported, x)).collect::<Vec<_>>();
-    dbg!(a.filter(|x| x.));
+    println!("day22a: {}", a.iter().filter(|x| x.map(|y| y==0).unwrap_or(false)).count());
+    println!("day22b: {}", a.iter().map(|x| x.unwrap_or(0)).sum::<usize>());
 }
