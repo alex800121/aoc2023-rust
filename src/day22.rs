@@ -5,7 +5,6 @@ use nom::{
     sequence::{separated_pair, terminated, tuple},
     IResult,
 };
-use num::CheckedSub;
 use project_root::get_project_root;
 use std::{i32, collections::{BTreeMap, BTreeSet}};
 
@@ -86,7 +85,7 @@ fn settle_brick(bricks: &mut Vec<Brick>) -> (SMap, SMap) {
 type SMap = BTreeMap<Brick, BTreeSet<Brick>>;
 fn calc_collapse(foundation: &SMap, supported: &SMap, brick: &Brick) -> Option<usize> {
     let mut removed = BTreeSet::from([*brick]);
-    let mut n = 0;
+    let _n = 0;
     let mut foundation = foundation.clone();
     let mut supported = supported.clone();
     let mut acc = BTreeSet::new();

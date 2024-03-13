@@ -2,7 +2,6 @@ use aoc2023::{
     Direction::{self, *},
     Enum,
 };
-use itertools::Itertools;
 use project_root::get_project_root;
 use std::collections::{BTreeMap, BTreeSet};
 const N: usize = 141;
