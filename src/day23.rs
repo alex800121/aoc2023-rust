@@ -2,16 +2,18 @@ use aoc2023::{
     Direction::{self, *},
     Enum,
 };
+use itertools::Itertools;
 use project_root::get_project_root;
 use std::collections::{BTreeMap, BTreeSet};
 const N: usize = 141;
 type M = [[char; N]; N];
 type Index = (isize, isize);
+const LEN: usize = 36;
 // type Vertex = (Index, Index);
-type KMap = BTreeMap<Index, BTreeMap<Index, usize>>;
+type KMap = [[Option<usize>; LEN]; LEN];
 fn bfs(start: &Index, end: &Index, m: &M) -> KMap {
-    let mut kmap: KMap = BTreeMap::new();
-    let mut joints = vec![*start];
+    let mut kmap: KMap = [[None; LEN]; LEN];
+    let mut joints = vec![*start, *end];
     for x in 1..(N - 1) {
         for y in 1..(N - 1) {
             if [North, East, South, West]
@@ -30,12 +32,13 @@ fn bfs(start: &Index, end: &Index, m: &M) -> KMap {
             }
         }
     }
+    let joints: [Index; LEN] = joints.try_into().unwrap();
+    // dbg!(joints.len());
     // dbg!(&joints);
-    for &s in joints.iter() {
+    for (i0, s) in joints.iter().enumerate() {
         let mut n = 0;
-        let mut start0 = vec![s];
+        let mut start0 = vec![*s];
         let mut visited = BTreeSet::new();
-        // dbg!(&start0);
         while !start0.is_empty() {
             let mut next_start0 = vec![];
             for s0 @ (x0, y0) in start0.drain(..) {
@@ -49,24 +52,17 @@ fn bfs(start: &Index, end: &Index, m: &M) -> KMap {
                         && y < N as isize
                         && !visited.contains(&s1)
                     {
-                        match m[y as usize][x as usize] {
-                            _ if s1 == *end => {
-                                if let Some(m) = kmap.get_mut(&s) {
-                                    m.insert(*end, n + 1);
-                                } else {
-                                    kmap.insert(s, BTreeMap::from([(*end, n + 1)]));
-                                }
+                        match (m[y as usize][x as usize], joints.iter().find_position(|&&k| k == s1)) {
+                            (_, Some((i1, _))) => {
+                                kmap[i0][i1] = Some(n + 1);
+                                // if let Some(m) = kmap.get_mut(&s) {
+                                //     m.insert(*end, n + 1);
+                                // } else {
+                                //     kmap.insert(s, BTreeMap::from([(*end, n + 1)]));
+                                // }
                                 // kmap.insert((s, *end), n + 1);
-                            }
-                            _ if joints.contains(&s1) => {
-                                if let Some(m) = kmap.get_mut(&s) {
-                                    m.insert(s1, n + 1);
-                                } else {
-                                    kmap.insert(s, BTreeMap::from([(s1, n + 1)]));
-                                }
-                                // kmap.insert((s, s1), n + 1);
-                            }
-                            c if c != '#' && c != to_char(d.succ().succ()) => {
+                            },
+                            (c, _) if c != '#' && c != to_char(d.succ().succ()) => {
                                 next_start0.push((x, y));
                             }
                             _ => {}
@@ -90,57 +86,24 @@ fn to_char(d: Direction) -> char {
     }
 }
 
-fn all_routes_2(start: &Index, end: &Index, kmap0: &KMap) -> Vec<usize> {
-    let mut kmap: KMap = BTreeMap::new();
-    for (k0, l) in kmap0 {
-        for (k1, n) in l {
-            if let Some(x) = kmap.get_mut(k0) {
-                x.insert(*k1, *n);
-            } else {
-                kmap.insert(*k0, BTreeMap::from([(*k1, *n)]));
-            }
-            if let Some(x) = kmap.get_mut(k1) {
-                x.insert(*k0, *n);
-            } else {
-                kmap.insert(*k1, BTreeMap::from([(*k0, *n)]));
-            }
-        }
-    }
-    // dbg!(&kmap);
-    let mut start = vec![(*start, BTreeSet::new(), 0)];
+fn all_routes(start: usize, end: usize, kmap: &KMap) -> Vec<usize> {
+    let mut start = vec![(start, 0u64, 0)];
     let mut acc = vec![];
     while !start.is_empty() {
         // dbg!(&start);
         let mut next_start = vec![];
-        for (s, mut visited, n0) in start.drain(..) {
-            visited.insert(s);
-            if s == *end {
+        for (s0, visited0, n0) in start.drain(..) {
+            if s0 == end {
                 acc.push(n0);
-            } else if let Some(m) = kmap.get(&s) {
-                for (x, y) in m {
-                    if !visited.contains(x) {
-                        next_start.push((*x, visited.clone(), n0 + *y));
+            } else {
+                let visited1 = visited0 | (1 << s0);
+                let m = kmap[s0];
+                for (s1, n1) in m.iter().enumerate().filter_map(|x| {
+                    x.1.map(|y| (x.0, y))
+                }) {
+                    if (visited1 >> s1) & 1 == 0 {
+                        next_start.push((s1, visited1, n1 + n0));
                     }
-                }
-            }
-        }
-        start = next_start;
-    }
-    acc
-}
-fn all_routes(start: &Index, end: &Index, kmap: &KMap) -> Vec<usize> {
-    let mut start = vec![(*start, 0)];
-    let mut acc = vec![];
-    while !start.is_empty() {
-        // dbg!(&start);
-        let mut next_start = vec![];
-        for (s, n0) in start.drain(..) {
-            // dbg!(n0);
-            if s == *end {
-                acc.push(n0);
-            } else if let Some(m) = kmap.get(&s) {
-                for (x, y) in m {
-                    next_start.push((*x, n0 + *y));
                 }
             }
         }
@@ -189,10 +152,15 @@ pub fn run(day: usize) {
         })
         .unwrap();
     let kmap = bfs(&start, &end, &m);
-    // dbg!(kmap);
-    // dbg!(kmap.iter().find(|((a, b), n)| *a == (125, 123)));
-    let a = all_routes(&start, &end, &kmap);
+    let a = all_routes(0, 1, &kmap);
     println!("day23a: {}", a.iter().max().unwrap());
-    let b = all_routes_2(&start, &end, &kmap);
+    let mut kmap0: KMap = [[None; LEN]; LEN];
+    for (k0, l) in kmap.iter().enumerate() {
+        for (k1, n) in l.iter().enumerate().filter_map(|x| x.1.map(|y| (x.0, y))) {
+            kmap0[k0][k1] = Some(n);
+            kmap0[k1][k0] = Some(n);
+        }
+    }
+    let b = all_routes(0, 1, &kmap0);
     println!("day23b: {}", b.iter().max().unwrap());
 }
