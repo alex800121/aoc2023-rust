@@ -17,3 +17,6 @@ num = "0.4"
 pathfinding = "4.9"
 itertools = "0.12"
 nalgebra = "0.32"
+graph_builder = "0.4"
+rand = { version = "0.8.5", features = ["small_rng"]}
+petgraph = "0.6.4"
