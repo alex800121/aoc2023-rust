@@ -1,8 +1,12 @@
 use itertools::Itertools;
+use petgraph::{
+    data::{Build, DataMap},
+    graph::{Node, UnGraph},
+    visit::{EdgeRef, IntoEdgeReferences},
+};
 use project_root::get_project_root;
-use std::collections::HashMap;
-use petgraph::{graph::UnGraph, visit::{EdgeCount, EdgeRef}};
 use rand::{prelude::*, rngs::SmallRng};
+use std::collections::HashMap;
 
 fn to_u8(s: &str) -> Option<[u8; 3]> {
     s.bytes().collect_vec().try_into().ok()
@@ -18,19 +22,63 @@ fn get_hmap(hmap: &mut HMap, max_index: &mut u32, s: [u8; 3]) -> u32 {
         *max_index - 1
     }
 }
-fn karger(g: &mut G, s: u64) {
-    let mut rng = SmallRng::seed_from_u64(s);
-    loop {
-        if g.edge_count() <= 1 {
-            return;
+// fn karger(g: &G) -> G {
+fn karger(g: &G) -> u32 {
+    let mut s = 0;
+    's: loop  {
+        let mut g = g.clone();
+        let mut rng = SmallRng::seed_from_u64(s);
+        loop {
+            // dbg!(&g);
+            if g.edge_count() <= 1 {
+                let e = g.edge_references().find_or_first(|_| true).unwrap();
+                if *e.weight() == 3 {
+                    return g.node_weight(e.source()).unwrap() * g.node_weight(e.target()).unwrap();
+                    // return g;
+                } else {
+                    s += 1;
+                    continue 's;
+                }
+            }
+            let m = g.edge_weights().max().unwrap();
+            let max_edges = g
+                .edge_references()
+                .filter(|x| x.weight() == m)
+                .collect_vec();
+            let selected = max_edges
+                .get(rng.next_u32() as usize % max_edges.len())
+                .unwrap();
+            let source = selected.source();
+            let target = selected.target();
+            let node_weight = *g.node_weight(target).unwrap();
+            // dbg!(&selected, &source, &target);
+            for n in g.neighbors_undirected(target).collect_vec() {
+                if n != source {
+                    let w = *g
+                        .edge_weight(g.find_edge_undirected(target, n).unwrap().0)
+                        .unwrap();
+                    // dbg!(&w);
+                    if let Some(e) = g
+                        .find_edge_undirected(source, n)
+                        .or(g.find_edge_undirected(n, source))
+                        .and_then(|x| g.edge_weight_mut(x.0))
+                    {
+                        *e += w;
+                    } else {
+                        g.add_edge(source, n, w);
+                    }
+                }
+            }
+            if let Some(w) = g.node_weight_mut(source) {
+                *w += node_weight;
+            }
+            g.remove_node(target);
         }
-        let m = g.edge_weights().max().unwrap();
-        let max_edges = g.edge_references().filter(|x| x.weight() == m).collect_vec();
-        let selected = max_edges.get(rng.next_u32() as usize % max_edges.len()).unwrap().id();
     }
 }
 pub fn run(day: usize) {
     let input = std::fs::read_to_string(format!(
+        // "{}/input/test{:02}.txt",
         "{}/input/input{:02}.txt",
         get_project_root().unwrap().to_str().unwrap(),
         day
@@ -56,20 +104,14 @@ pub fn run(day: usize) {
         // v.resize(max_index, u.clone());
         for (x, ys) in xy {
             for y in ys {
-                // (|| {
-                //     let a = v.get_mut(x)?;
-                //     let b = a.get_mut(y)?;
-                //     *b = 1;
-                //     let a = v.get_mut(y)?;
-                //     let b = a.get_mut(x)?;
-                //     *b = 1;
-                //     Some(())
-                // })();
                 v.push((x, y, 1));
             }
         }
-        UnGraph::<u32, u32>::from_edges(v)
+        let mut v = UnGraph::<u32, u32>::from_edges(v);
+        v.node_weights_mut().for_each(|n| *n = 1);
+        v
     };
     // dbg!(g.iter().map(|v| v.iter().sum::<usize>()).sum::<usize>());
-    dbg!(g);
+    println!("day25a: {}", karger(&g));
+    println!("Merry Christmas!");
 }
